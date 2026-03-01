@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <title>Exile-Insight</title>
+  <style>
+    /* =========================================================
+       Exile-Insight UI — Dark-mode, high-contrast fintech style
+       Tailwind-inspired utility classes (inline for simplicity)
+       ========================================================= */
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a28;
+      --bg-card-hover: #222235;
+      --border: #2a2a3d;
+      --text-primary: #e8e8f0;
+      --text-secondary: #8888a0;
+      --text-muted: #555570;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-gold: #f59e0b;
+      --accent-blue: #3b82f6;
+      --accent-purple: #a855f7;
+      --accent-cyan: #06b6d4;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    /* Layout */
+    .app-container {
+      display: grid;
+      grid-template-rows: 48px 1fr;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
+    }
+
+    .header {
+      grid-column: 1 / -1;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .header h1 span { color: var(--accent-gold); }
+
+    .sidebar {
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .main-content {
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-red);
+    }
+
+    .status-dot.active { background: var(--accent-green); animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Build Profile Panel */
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .build-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .build-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-gold);
+      margin-bottom: 4px;
+    }
+
+    .build-meta {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 4px 8px;
+      background: var(--bg-primary);
+      border-radius: 4px;
+    }
+
+    .stat-label { color: var(--text-secondary); }
+    .stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .stat-value.danger { color: var(--accent-red); }
+    .stat-value.safe { color: var(--accent-green); }
+
+    /* Requirements */
+    .requirement-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 6px 8px;
+      background: var(--bg-primary);
+      border-radius: 4px;
+      margin-bottom: 4px;
+      border-left: 3px solid var(--accent-red);
+    }
+
+    .requirement-item.met {
+      border-left-color: var(--accent-green);
+      opacity: 0.6;
+    }
+
+    /* Import Section */
+    .import-section { margin-bottom: 16px; }
+
+    .pob-input {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 12px;
+      font-family: monospace;
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .pob-input:focus { outline: none; border-color: var(--accent-blue); }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: white;
+    }
+
+    .btn-primary:hover { background: #2563eb; }
+
+    .btn-success {
+      background: var(--accent-green);
+      color: white;
+    }
+
+    .btn-success:hover { background: #16a34a; }
+
+    .btn-danger {
+      background: var(--accent-red);
+      color: white;
+    }
+
+    .btn-danger:hover { background: #dc2626; }
+
+    /* Deal Cards */
+    .deals-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .deal-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      transition: all 0.15s;
+      cursor: default;
+    }
+
+    .deal-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-gold);
+    }
+
+    .deal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .deal-item-name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .deal-item-name.rare { color: var(--accent-gold); }
+    .deal-item-name.unique { color: #c77b2f; }
+    .deal-item-name.magic { color: var(--accent-blue); }
+
+    .deal-score {
+      font-size: 20px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      padding: 2px 10px;
+      border-radius: 6px;
+      min-width: 48px;
+      text-align: center;
+    }
+
+    .deal-score.tier-s { background: #22c55e22; color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .deal-score.tier-a { background: #3b82f622; color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+    .deal-score.tier-b { background: #f59e0b22; color: var(--accent-gold); border: 1px solid var(--accent-gold); }
+    .deal-score.tier-c { background: #8888a022; color: var(--text-secondary); border: 1px solid var(--border); }
+
+    .deal-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .deal-stat {
+      text-align: center;
+      padding: 8px;
+      background: var(--bg-primary);
+      border-radius: 6px;
+    }
+
+    .deal-stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .deal-stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .deal-stat-value.positive { color: var(--accent-green); }
+    .deal-stat-value.negative { color: var(--accent-red); }
+    .deal-stat-value.deal { color: var(--accent-cyan); }
+
+    .deal-mods {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .deal-mods .mod-line {
+      padding: 2px 0;
+    }
+
+    .deal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      background: var(--accent-purple);
+      color: white;
+    }
+
+    .ai-reasoning {
+      font-size: 12px;
+      font-style: italic;
+      color: var(--accent-purple);
+      margin-top: 8px;
+      padding: 8px;
+      background: #a855f710;
+      border-radius: 4px;
+      border-left: 2px solid var(--accent-purple);
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 60vh;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .empty-state h2 { font-size: 18px; margin-bottom: 8px; color: var(--text-secondary); }
+    .empty-state p { font-size: 13px; max-width: 400px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <h1>EXILE-<span>INSIGHT</span></h1>
+      <div class="status-bar">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Offline</span>
+        <span id="itemCount"></span>
+      </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <!-- Import -->
+      <div class="import-section">
+        <div class="section-title">Import Build</div>
+        <textarea class="pob-input" id="pobInput" placeholder="Paste your PoB export code here..."></textarea>
+        <button class="btn btn-primary" id="btnImport">Import Build</button>
+      </div>
+
+      <!-- Build Profile -->
+      <div id="buildSection" style="display: none;">
+        <div class="section-title">Build Profile</div>
+        <div class="build-card">
+          <div class="build-name" id="buildName">—</div>
+          <div class="build-meta" id="buildMeta">—</div>
+          <div class="stat-grid" id="statsGrid"></div>
+        </div>
+
+        <!-- Requirements -->
+        <div class="section-title">Requirements</div>
+        <div id="requirementsList"></div>
+
+        <!-- Controls -->
+        <button class="btn btn-success" id="btnStart" style="margin-top: 16px;">Start Monitoring</button>
+        <button class="btn btn-danger" id="btnStop" style="display: none; margin-top: 8px;">Stop Monitoring</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div id="emptyState" class="empty-state">
+        <h2>No Deals Yet</h2>
+        <p>Import your Path of Building code in the sidebar, then start monitoring to see real-time deal recommendations for your build.</p>
+      </div>
+
+      <div id="dealsContainer" style="display: none;">
+        <div class="section-title">Top Deals</div>
+        <div class="deals-grid" id="dealsGrid"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // ---- Renderer Logic ----
+    const api = window.exileInsight;
+
+    const pobInput = document.getElementById('pobInput');
+    const btnImport = document.getElementById('btnImport');
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    const buildSection = document.getElementById('buildSection');
+    const buildName = document.getElementById('buildName');
+    const buildMeta = document.getElementById('buildMeta');
+    const statsGrid = document.getElementById('statsGrid');
+    const requirementsList = document.getElementById('requirementsList');
+    const dealsGrid = document.getElementById('dealsGrid');
+    const dealsContainer = document.getElementById('dealsContainer');
+    const emptyState = document.getElementById('emptyState');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const itemCount = document.getElementById('itemCount');
+
+    // Import build
+    btnImport.addEventListener('click', () => {
+      const code = pobInput.value.trim();
+      if (code) api.importBuild(code);
+    });
+
+    // Monitor controls
+    btnStart.addEventListener('click', () => api.startMonitoring());
+    btnStop.addEventListener('click', () => api.stopMonitoring());
+
+    // Build update
+    api.onBuildUpdate((data) => {
+      buildSection.style.display = 'block';
+      buildName.textContent = data.name + (data.ascendancy ? ` (${data.ascendancy})` : '');
+      buildMeta.textContent = `Level ${data.level} ${data.class} — ${data.league}`;
+
+      // Stats
+      const statPairs = [
+        ['Life', data.stats.life, false],
+        ['ES', data.stats.energyShield, false],
+        ['DPS', Math.round(data.stats.totalDps).toLocaleString(), false],
+        ['Armour', data.stats.armour, false],
+        ['Fire Res', data.stats.fireRes + '%', data.stats.fireRes < 75],
+        ['Cold Res', data.stats.coldRes + '%', data.stats.coldRes < 75],
+        ['Light Res', data.stats.lightningRes + '%', data.stats.lightningRes < 75],
+        ['Chaos Res', data.stats.chaosRes + '%', data.stats.chaosRes < 0],
+      ];
+
+      statsGrid.innerHTML = statPairs.map(([label, value, danger]) =>
+        `<div class="stat-item">
+          <span class="stat-label">${label}</span>
+          <span class="stat-value ${danger ? 'danger' : 'safe'}">${value}</span>
+        </div>`
+      ).join('');
+
+      // Requirements
+      requirementsList.innerHTML = data.requirements.map(req =>
+        `<div class="requirement-item ${req.current >= req.target ? 'met' : ''}">
+          ${req.label}
+        </div>`
+      ).join('') || '<div style="font-size:12px;color:var(--text-muted);">All requirements met</div>';
+    });
+
+    // Deal updates
+    api.onDealsUpdate((deals) => {
+      if (deals.length === 0) return;
+
+      emptyState.style.display = 'none';
+      dealsContainer.style.display = 'block';
+
+      dealsGrid.innerHTML = deals.map(deal => {
+        const scoreClass = deal.dealScore >= 70 ? 'tier-s' :
+                          deal.dealScore >= 50 ? 'tier-a' :
+                          deal.dealScore >= 30 ? 'tier-b' : 'tier-c';
+
+        const rarityClass = deal.item.rarity.toLowerCase();
+
+        const dpsPrefix = deal.evaluation.dpsChange.percentage >= 0 ? '+' : '';
+        const ehpPrefix = deal.evaluation.ehpChange.percentage >= 0 ? '+' : '';
+
+        const priceDisplay = deal.pricing.currentPrice
+          ? `${deal.pricing.currentPrice.amount} ${deal.pricing.currentPrice.currency}`
+          : 'Unpriced';
+
+        const priceRatioPercent = Math.round(deal.pricing.priceRatio * 100);
+
+        const aiSection = deal.aiAnalysis
+          ? `<div class="ai-reasoning">
+              <span class="ai-badge">AI ${deal.aiAnalysis.tier}</span>
+              ${deal.aiAnalysis.reasoning}
+            </div>`
+          : '';
+
+        return `<div class="deal-card">
+          <div class="deal-header">
+            <div>
+              <div class="deal-item-name ${rarityClass}">${deal.item.name || deal.item.baseType}</div>
+              <div style="font-size:12px;color:var(--text-secondary);">${deal.item.baseType} — iLvl ${deal.item.itemLevel}</div>
+            </div>
+            <div class="deal-score ${scoreClass}">${deal.dealScore}</div>
+          </div>
+
+          <div class="deal-stats">
+            <div class="deal-stat">
+              <div class="deal-stat-label">DPS Change</div>
+              <div class="deal-stat-value ${deal.evaluation.dpsChange.percentage >= 0 ? 'positive' : 'negative'}">
+                ${dpsPrefix}${deal.evaluation.dpsChange.percentage.toFixed(1)}%
+              </div>
+            </div>
+            <div class="deal-stat">
+              <div class="deal-stat-label">EHP Change</div>
+              <div class="deal-stat-value ${deal.evaluation.ehpChange.percentage >= 0 ? 'positive' : 'negative'}">
+                ${ehpPrefix}${deal.evaluation.ehpChange.percentage.toFixed(1)}%
+              </div>
+            </div>
+            <div class="deal-stat">
+              <div class="deal-stat-label">Price vs Market</div>
+              <div class="deal-stat-value deal">${priceRatioPercent}%</div>
+            </div>
+          </div>
+
+          <div class="deal-mods">
+            ${deal.item.mods.explicit.map(m => `<div class="mod-line">${m}</div>`).join('')}
+          </div>
+
+          ${aiSection}
+
+          <div class="deal-footer">
+            <span>${priceDisplay}</span>
+            <span>Seller: ${deal.item.seller}</span>
+          </div>
+        </div>`;
+      }).join('');
+    });
+
+    // Status updates
+    api.onStatusUpdate((status) => {
+      if (status.polling) {
+        statusDot.classList.add('active');
+        statusText.textContent = status.rateLimited ? 'Rate Limited' : 'Monitoring';
+        btnStart.style.display = 'none';
+        btnStop.style.display = 'block';
+      } else {
+        statusDot.classList.remove('active');
+        statusText.textContent = 'Offline';
+        btnStart.style.display = 'block';
+        btnStop.style.display = 'none';
+      }
+
+      if (status.itemsProcessed !== undefined) {
+        itemCount.textContent = `${status.itemsProcessed.toLocaleString()} items processed`;
+      }
+
+      if (status.lastError) {
+        statusText.textContent = `Error: ${status.lastError}`;
+      }
+    });
+  </script>
+</body>
+</html>
