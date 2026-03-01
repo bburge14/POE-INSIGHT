@@ -3,10 +3,8 @@ import {
   type BuildProfile, type InsertBuildProfile,
   type SavedItem, type InsertSavedItem,
   type MetaBase, type InsertMetaBase,
-  users, buildProfiles, savedItems, metaBases,
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -33,95 +31,126 @@ export interface IStorage {
   deleteMetaBase(id: string): Promise<void>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class MemoryStorage implements IStorage {
+  private users: Map<string, User> = new Map();
+  private profiles: Map<string, BuildProfile> = new Map();
+  private items: Map<string, SavedItem> = new Map();
+  private bases: Map<string, MetaBase> = new Map();
+
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return this.users.get(id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    return [...this.users.values()].find(u => u.username === username);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    const user: User = { id: randomUUID(), ...insertUser };
+    this.users.set(user.id, user);
     return user;
   }
 
   async getProfiles(): Promise<BuildProfile[]> {
-    return db.select().from(buildProfiles).orderBy(desc(buildProfiles.createdAt));
+    return [...this.profiles.values()].sort(
+      (a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
+    );
   }
 
   async getProfile(id: string): Promise<BuildProfile | undefined> {
-    const [profile] = await db.select().from(buildProfiles).where(eq(buildProfiles.id, id));
-    return profile;
+    return this.profiles.get(id);
   }
 
   async getActiveProfile(): Promise<BuildProfile | undefined> {
-    const [profile] = await db.select().from(buildProfiles).where(eq(buildProfiles.isActive, true));
-    return profile;
+    return [...this.profiles.values()].find(p => p.isActive);
   }
 
   async createProfile(profile: InsertBuildProfile): Promise<BuildProfile> {
-    const [created] = await db.insert(buildProfiles).values(profile).returning();
+    const created: BuildProfile = {
+      id: randomUUID(),
+      name: profile.name,
+      classType: profile.classType,
+      weights: profile.weights,
+      isActive: profile.isActive ?? false,
+      createdAt: new Date(),
+    };
+    this.profiles.set(created.id, created);
     return created;
   }
 
   async updateProfileWeights(id: string, weights: Record<string, number>): Promise<BuildProfile | undefined> {
-    const [updated] = await db.update(buildProfiles).set({ weights }).where(eq(buildProfiles.id, id)).returning();
-    return updated;
+    const profile = this.profiles.get(id);
+    if (!profile) return undefined;
+    profile.weights = weights;
+    return profile;
   }
 
   async activateProfile(id: string): Promise<void> {
-    await db.update(buildProfiles).set({ isActive: false });
-    await db.update(buildProfiles).set({ isActive: true }).where(eq(buildProfiles.id, id));
+    for (const p of this.profiles.values()) {
+      p.isActive = false;
+    }
+    const profile = this.profiles.get(id);
+    if (profile) profile.isActive = true;
   }
 
   async deleteProfile(id: string): Promise<void> {
-    await db.delete(buildProfiles).where(eq(buildProfiles.id, id));
+    this.profiles.delete(id);
   }
 
   async getSavedItems(): Promise<SavedItem[]> {
-    return db.select().from(savedItems).orderBy(desc(savedItems.savedAt));
+    return [...this.items.values()].sort(
+      (a, b) => new Date(b.savedAt!).getTime() - new Date(a.savedAt!).getTime()
+    );
   }
 
   async getSavedItem(id: string): Promise<SavedItem | undefined> {
-    const [item] = await db.select().from(savedItems).where(eq(savedItems.id, id));
-    return item;
+    return this.items.get(id);
   }
 
   async createSavedItem(item: InsertSavedItem): Promise<SavedItem> {
-    const [created] = await db.insert(savedItems).values(item).returning();
+    const created: SavedItem = {
+      id: randomUUID(),
+      rawText: item.rawText,
+      parsedData: item.parsedData,
+      evaluation: item.evaluation ?? null,
+      notes: item.notes ?? null,
+      savedAt: new Date(),
+    };
+    this.items.set(created.id, created);
     return created;
   }
 
   async deleteSavedItem(id: string): Promise<void> {
-    await db.delete(savedItems).where(eq(savedItems.id, id));
+    this.items.delete(id);
   }
 
   async getMetaBases(): Promise<MetaBase[]> {
-    return db.select().from(metaBases);
+    return [...this.bases.values()];
   }
 
   async getMetaBase(id: string): Promise<MetaBase | undefined> {
-    const [base] = await db.select().from(metaBases).where(eq(metaBases.id, id));
-    return base;
+    return this.bases.get(id);
   }
 
   async getMetaBaseByName(name: string): Promise<MetaBase | undefined> {
-    const [base] = await db.select().from(metaBases).where(eq(metaBases.name, name));
-    return base;
+    return [...this.bases.values()].find(b => b.name === name);
   }
 
   async createMetaBase(base: InsertMetaBase): Promise<MetaBase> {
-    const [created] = await db.insert(metaBases).values(base).returning();
+    const created: MetaBase = {
+      id: randomUUID(),
+      name: base.name,
+      category: base.category,
+      tier: base.tier,
+      notes: base.notes ?? null,
+    };
+    this.bases.set(created.id, created);
     return created;
   }
 
   async deleteMetaBase(id: string): Promise<void> {
-    await db.delete(metaBases).where(eq(metaBases.id, id));
+    this.bases.delete(id);
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemoryStorage();
