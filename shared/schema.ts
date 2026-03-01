@@ -126,6 +126,17 @@ export interface ItemEvaluation {
     source: string;
   };
   modScores?: { mod: string; score: number; weight: number }[];
+  aiAnalysis?: AIItemAnalysis;
+}
+
+export interface AIItemAnalysis {
+  verdict: string;
+  reasoning: string;
+  synergies: string[];
+  warnings: string[];
+  craftingTips: string[];
+  estimatedTier: "S" | "A" | "B" | "C" | "D" | "F";
+  keepForBuilds: string[];
 }
 
 export interface NinjaCurrency {

@@ -1,10 +1,12 @@
 import { useState, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ItemDisplay } from "@/components/item-display";
 import { TradeListings } from "@/components/trade-listings";
 import { parseItemText } from "@/lib/item-parser";
@@ -19,6 +21,7 @@ import {
   Loader2,
   ClipboardPaste,
   Sparkles,
+  Brain,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -46,16 +49,29 @@ export default function Home() {
   const [rawText, setRawText] = useState("");
   const [parsedItem, setParsedItem] = useState<ParsedItem | null>(null);
   const [evaluation, setEvaluation] = useState<ItemEvaluation | null>(null);
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Check if AI is available on the backend
+  const { data: aiStatus } = useQuery<{ available: boolean; model: string }>({
+    queryKey: ["/api/ai/status"],
+    staleTime: 60_000,
+  });
 
   const evaluateMutation = useMutation({
     mutationFn: async (text: string) => {
-      const res = await apiRequest("POST", "/api/evaluate", { rawText: text });
+      const endpoint = aiEnabled ? "/api/evaluate/ai" : "/api/evaluate";
+      const res = await apiRequest("POST", endpoint, { rawText: text });
       return res.json();
     },
-    onSuccess: (data: { parsed: ParsedItem; evaluation: ItemEvaluation }) => {
+    onSuccess: (data: { parsed: ParsedItem; evaluation: ItemEvaluation; aiError?: string }) => {
       setParsedItem(data.parsed);
       setEvaluation(data.evaluation);
+      setAiError(data.aiError || null);
+      if (data.aiError) {
+        toast({ title: "AI Unavailable", description: data.aiError, variant: "destructive" });
+      }
     },
     onError: (err: Error) => {
       toast({ title: "Evaluation Error", description: err.message, variant: "destructive" });
@@ -92,6 +108,7 @@ export default function Home() {
     }
     setParsedItem(parsed);
     setEvaluation(null);
+    setAiError(null);
     evaluateMutation.mutate(rawText);
   }, [rawText, toast, evaluateMutation]);
 
@@ -114,17 +131,47 @@ export default function Home() {
     setRawText("");
     setParsedItem(null);
     setEvaluation(null);
+    setAiError(null);
   }, []);
 
   const hasResults = parsedItem && !evaluateMutation.isPending;
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Item Advisor</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Paste your PoE2 item text (Ctrl+C in game) to get instant crafting and trade advice.
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Item Advisor</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Paste your PoE2 item text (Ctrl+C in game) to get instant crafting and trade advice.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="ai-toggle"
+              checked={aiEnabled}
+              onCheckedChange={setAiEnabled}
+              data-testid="switch-ai-toggle"
+            />
+            <Label
+              htmlFor="ai-toggle"
+              className={`flex items-center gap-1.5 text-sm cursor-pointer ${aiEnabled ? "text-purple-400" : "text-muted-foreground"}`}
+            >
+              <Brain className={`h-4 w-4 ${aiEnabled ? "text-purple-400" : ""}`} />
+              AI Analysis
+            </Label>
+          </div>
+          {aiEnabled && !aiStatus?.available && (
+            <Badge variant="outline" className="text-[10px] text-yellow-500 border-yellow-600">
+              No API Key
+            </Badge>
+          )}
+          {aiEnabled && aiStatus?.available && (
+            <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-600">
+              GPT-4o
+            </Badge>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -167,15 +214,17 @@ export default function Home() {
               <Button
                 onClick={handleParse}
                 disabled={evaluateMutation.isPending || !rawText.trim()}
-                className="flex-1 md:flex-none"
+                className={`flex-1 md:flex-none ${aiEnabled ? "bg-purple-600 hover:bg-purple-700" : ""}`}
                 data-testid="button-analyze"
               >
                 {evaluateMutation.isPending ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : aiEnabled ? (
+                  <Brain className="h-4 w-4 mr-2" />
                 ) : (
                   <Zap className="h-4 w-4 mr-2" />
                 )}
-                Analyze
+                {aiEnabled ? "AI Analyze" : "Analyze"}
               </Button>
               <Button
                 variant="secondary"
