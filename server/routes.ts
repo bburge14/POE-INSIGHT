@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { parseItemText } from "./parser";
 import { evaluateItem } from "./evaluator";
+import { aiEvaluateItem } from "./ai-evaluator";
 import { getCurrencies, getUniqueItems, searchTrade } from "./ninja";
 import { seedDatabase } from "./seed";
 import { insertBuildProfileSchema, insertMetaBaseSchema } from "@shared/schema";
@@ -35,6 +36,49 @@ export async function registerRoutes(
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }
+  });
+
+  // AI-enhanced evaluation endpoint
+  app.post("/api/evaluate/ai", async (req, res) => {
+    try {
+      const { rawText } = req.body;
+      if (!rawText || typeof rawText !== "string") {
+        return res.status(400).json({ message: "rawText is required" });
+      }
+
+      const parsed = parseItemText(rawText);
+      if (!parsed) {
+        return res.status(400).json({ message: "Could not parse item text" });
+      }
+
+      const metaBases = await storage.getMetaBases();
+      const activeProfile = await storage.getActiveProfile();
+
+      // Run rule-based evaluation first
+      const evaluation = await evaluateItem(parsed, metaBases, activeProfile);
+
+      // Then run AI analysis on top
+      const aiResult = await aiEvaluateItem(parsed, evaluation, activeProfile);
+
+      if ("error" in aiResult) {
+        return res.json({ parsed, evaluation, aiError: aiResult.error });
+      }
+
+      // Merge AI analysis into the evaluation
+      evaluation.aiAnalysis = aiResult.aiAnalysis;
+
+      return res.json({ parsed, evaluation });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Check if AI is available (has API key)
+  app.get("/api/ai/status", (_req, res) => {
+    return res.json({
+      available: !!process.env.OPENAI_API_KEY,
+      model: "gpt-4o",
+    });
   });
 
   app.post("/api/trade/search", async (req, res) => {

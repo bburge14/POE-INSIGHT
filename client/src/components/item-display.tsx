@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, XCircle, AlertTriangle, Star, Flame, Hammer, ShoppingCart, Archive, HelpCircle, ArrowRight, Coins, Wrench, Users, ExternalLink } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, Star, Flame, Hammer, ShoppingCart, Archive, HelpCircle, ArrowRight, Coins, Wrench, Users, ExternalLink, Brain, Lightbulb, AlertOctagon, Sparkles } from "lucide-react";
 
 interface ItemDisplayProps {
   item: ParsedItem;
@@ -106,6 +106,7 @@ export function ItemDisplay({ item, evaluation }: ItemDisplayProps) {
             {evaluation.craftingAdvice && evaluation.craftingAdvice.length > 0 && <CraftingCard evaluation={evaluation} />}
           </div>
           <div className="space-y-4">
+            {evaluation.aiAnalysis && <AIAnalysisCard evaluation={evaluation} />}
             {evaluation.buildFits && evaluation.buildFits.length > 0 && <BuildFitsCard evaluation={evaluation} />}
             <AnalysisCard evaluation={evaluation} />
           </div>
@@ -359,6 +360,95 @@ function AnalysisCard({ evaluation }: { evaluation: ItemEvaluation }) {
             </div>
           </>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const TIER_COLORS: Record<string, string> = {
+  S: "bg-green-600 text-white",
+  A: "bg-blue-600 text-white",
+  B: "bg-yellow-600 text-white",
+  C: "bg-orange-600 text-white",
+  D: "bg-red-600 text-white",
+  F: "bg-red-900 text-white",
+};
+
+function AIAnalysisCard({ evaluation }: { evaluation: ItemEvaluation }) {
+  const ai = evaluation.aiAnalysis;
+  if (!ai) return null;
+
+  return (
+    <Card className="border-purple-800/50 bg-purple-950/20" data-testid="card-ai-analysis">
+      <CardHeader className="flex flex-row items-center gap-2 pb-2">
+        <Brain className="h-4 w-4 text-purple-400 shrink-0" />
+        <h3 className="text-sm font-semibold text-purple-300">AI Analysis</h3>
+        <Badge className={`text-xs ml-auto ${TIER_COLORS[ai.estimatedTier] || "bg-muted"}`}>
+          Tier {ai.estimatedTier}
+        </Badge>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-purple-200" data-testid="text-ai-reasoning">{ai.reasoning}</p>
+
+        {ai.synergies.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-purple-400 flex items-center gap-1 mb-1">
+              <Sparkles className="h-3 w-3" /> Synergies
+            </p>
+            <div className="space-y-1">
+              {ai.synergies.map((s, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <Lightbulb className="h-3 w-3 mt-0.5 shrink-0 text-yellow-500" />
+                  <span>{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {ai.warnings.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-red-400 flex items-center gap-1 mb-1">
+              <AlertOctagon className="h-3 w-3" /> Warnings
+            </p>
+            <div className="space-y-1">
+              {ai.warnings.map((w, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-red-300/80">
+                  <AlertOctagon className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>{w}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {ai.craftingTips.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-blue-400 flex items-center gap-1 mb-1">
+              <Wrench className="h-3 w-3" /> AI Crafting Tips
+            </p>
+            <div className="space-y-1">
+              {ai.craftingTips.map((tip, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <ArrowRight className="h-3 w-3 mt-0.5 shrink-0 text-blue-400" />
+                  <span>{tip}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {ai.keepForBuilds.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {ai.keepForBuilds.map((build, i) => (
+              <Badge key={i} variant="outline" className="text-[10px] border-purple-600 text-purple-300">
+                {build}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        <p className="text-[10px] text-purple-500 pt-1">Powered by GPT-4o</p>
       </CardContent>
     </Card>
   );
