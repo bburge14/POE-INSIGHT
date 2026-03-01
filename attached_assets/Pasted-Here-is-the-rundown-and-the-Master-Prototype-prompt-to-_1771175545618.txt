@@ -1,0 +1,63 @@
+Here is the rundown and the "Master Prototype" prompt to get you started on Replit.
+
+1. The Strategy: How the Tool "Inspects"
+Since you are avoiding automation to stay safe, the "Inspection" works via a Keyboard Hook:
+
+The Trigger: User hovers over an item in PoE2 and presses Ctrl + C (or a custom hotkey).
+
+The Input: Path of Exile automatically copies the item’s raw text data (stats, base, ilvl) to the clipboard.
+
+The Processing: Your client monitors the clipboard, parses the text, and displays the "Advice" in the overlay window.
+
+2. Replit Setup Rundown
+To make this work on Replit (Node.js environment), you need these specific files:
+
+index.ts: The main entry point.
+
+parser.ts: Logic to turn raw PoE item text into a JSON object.
+
+evaluator.ts: The "Brain" that compares items to poe.ninja and Build Weights.
+
+ninja.ts: The service that fetches current market data.
+
+3. The Replit Starting Prompt
+Paste this into the Replit AI or use it to guide your first few files.
+
+Prompt: > "I am building the backend logic for a Path of Exile 2 (PoE2) trade and crafting advisor. This is a standalone client similar to PoE Overlay II.
+
+Please scaffold a Node.js project with the following:
+
+Item Parser: A function that takes a raw string (from the PoE 'Ctrl+C' clipboard format) and parses it into a structured JSON object. It must identify: Base Type, Item Level, Rarity, and an array of Explicit/Implicit modifiers.
+
+poe.ninja Service: A module to fetch current price data from the poe.ninja public JSON API for PoE2 (Currency and Unique items).
+
+The Crafting Advisor: Logic that checks if an item is a 'Good Base.' It should flag items that are:
+
+White/Normal rarity.
+
+High Item Level (80+).
+
+'Meta' base types (e.g., Tense Crossbow, Gemini Bow, Omen Sceptre).
+
+Build Sync Concept: Create a placeholder function getBuildWeights() that simulates importing a build from Mobalytics or PoB, returning a dictionary of stats and their 'Importance Score' (e.g., {'Fire Resistance': 10, 'Life': 5}).
+
+Use TypeScript and ensure the code is modular so I can easily move it to a local Electron project later."
+
+4. Tips for Success
+The "Overlay" Shift
+Replit cannot "Overlay" your game because it's running in a browser. Once you move to Claude/Cursor:
+
+Tell Claude: "Help me port my Replit logic into an Electron app using window.setIgnoreMouseEvents and alwaysOnTop: true to create the overlay effect."
+
+Handling "Base Types"
+In PoE2, base types (the actual name of the item) are more important than ever.
+
+Tip: Ask Claude to create a bases.json file where you can manually add the names of high-tier items (like Advanced or Expert versions of gear) as you discover them in the meta.
+
+The Mobalytics Trick
+Mobalytics doesn't have an open API, but they use Standardized Slugs.
+
+Hint: If a user provides a Mobalytics URL, you can have the tool "Predict" the gear needs by looking at the tags in the URL (e.g., /builds/monk/monk-lightning-striker).
+
+How to make a PoE2 trade tool with AI
+This video is the perfect blueprint for your journey because it covers the exact workflow of using Claude and Cursor to build a trade tool, including the architecture you'll need after you finish the Replit prototype.
