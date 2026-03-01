@@ -1,0 +1,324 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ItemDeal",
+  "description": "Schema for an evaluated item deal in Exile-Insight. Represents an item that has been scored against the user's build and market data.",
+  "type": "object",
+  "required": ["id", "item", "dealScore", "evaluation", "pricing", "timestamp"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique deal identifier"
+    },
+    "item": {
+      "$ref": "#/definitions/PoE2Item"
+    },
+    "dealScore": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Composite score: 0-100. Breakdown: Build upgrade (0-40), Price value (0-30), AI bonus (0-15), Confidence (0-15)"
+    },
+    "evaluation": {
+      "$ref": "#/definitions/DealEvaluation"
+    },
+    "pricing": {
+      "$ref": "#/definitions/PriceAnalysis"
+    },
+    "aiAnalysis": {
+      "$ref": "#/definitions/AIAnalysis",
+      "description": "Only present for complex rare items that warranted LLM evaluation"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this deal was evaluated"
+    }
+  },
+  "definitions": {
+    "PoE2Item": {
+      "type": "object",
+      "description": "A normalized Path of Exile 2 item from the public stash API",
+      "required": ["id", "name", "baseType", "itemLevel", "rarity", "category", "mods"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Item ID from the PoE2 API"
+        },
+        "name": {
+          "type": "string",
+          "description": "Item name (empty for non-unique items)"
+        },
+        "baseType": {
+          "type": "string",
+          "description": "Base type of the item (e.g., 'Vaal Regalia', 'Diamond Ring')"
+        },
+        "itemLevel": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Item level, determines possible mod tiers"
+        },
+        "rarity": {
+          "type": "string",
+          "enum": ["Normal", "Magic", "Rare", "Unique"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["weapon", "armour", "accessory", "gem", "jewel", "flask", "currency", "gold"],
+          "description": "Item category. Note: PoE2 gems have sockets, gear does not."
+        },
+        "slot": {
+          "type": "string",
+          "enum": [
+            "helm", "body", "gloves", "boots", "belt",
+            "amulet", "ring1", "ring2",
+            "weapon1", "weapon2", "offhand1", "offhand2",
+            "flask1", "flask2", "flask3", "flask4", "flask5",
+            "jewel"
+          ],
+          "description": "Equipment slot this item fits into"
+        },
+        "mods": {
+          "type": "object",
+          "properties": {
+            "implicit": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/Mod" }
+            },
+            "explicit": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/Mod" }
+            },
+            "enchant": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/Mod" }
+            }
+          }
+        },
+        "requirements": {
+          "type": "object",
+          "properties": {
+            "level": { "type": "integer" },
+            "str": { "type": "integer" },
+            "dex": { "type": "integer" },
+            "int": { "type": "integer" }
+          },
+          "description": "Attribute and level requirements to equip the item"
+        },
+        "influences": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Item influences (e.g., Elder, Shaper)"
+        },
+        "stash": {
+          "type": "object",
+          "required": ["accountName", "stashName", "league"],
+          "properties": {
+            "accountName": { "type": "string" },
+            "stashName": { "type": "string" },
+            "league": { "type": "string" }
+          }
+        },
+        "listingPrice": {
+          "$ref": "#/definitions/Price",
+          "description": "Listed price from the stash tab note"
+        }
+      }
+    },
+    "Mod": {
+      "type": "object",
+      "required": ["text", "stats"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Human-readable mod text (e.g., '+50 to maximum Life')"
+        },
+        "tier": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Mod tier (1 = best roll). Null if unknown."
+        },
+        "stats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "value"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Canonical stat identifier (e.g., 'flat_life', 'percent_fire_res')"
+              },
+              "value": {
+                "type": "number",
+                "description": "Actual rolled value"
+              },
+              "min": {
+                "type": "number",
+                "description": "Minimum possible value for this tier"
+              },
+              "max": {
+                "type": "number",
+                "description": "Maximum possible value for this tier"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Price": {
+      "type": "object",
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Price amount"
+        },
+        "currency": {
+          "type": "string",
+          "description": "PoE2 currency type. Includes 'gold' as a primary currency in PoE2.",
+          "examples": ["exalted", "divine", "chaos", "gold", "alchemy", "mirror"]
+        }
+      }
+    },
+    "DealEvaluation": {
+      "type": "object",
+      "required": ["dpsChange", "ehpChange", "meetsRequirements", "isUpgrade"],
+      "properties": {
+        "dpsChange": {
+          "type": "object",
+          "required": ["absolute", "percentage"],
+          "properties": {
+            "absolute": {
+              "type": "number",
+              "description": "Absolute DPS change (positive = improvement)"
+            },
+            "percentage": {
+              "type": "number",
+              "description": "Percentage DPS change. >5% threshold for 'good deal'."
+            }
+          }
+        },
+        "ehpChange": {
+          "type": "object",
+          "required": ["absolute", "percentage"],
+          "properties": {
+            "absolute": {
+              "type": "number",
+              "description": "Absolute EHP change"
+            },
+            "percentage": {
+              "type": "number",
+              "description": "Percentage EHP change. >5% threshold for 'good deal'."
+            }
+          }
+        },
+        "statContributions": {
+          "type": "object",
+          "description": "Per-stat breakdown of the item's value contribution",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "description": "Raw stat delta vs current equipped item"
+              },
+              "weight": {
+                "type": "number",
+                "description": "Effective weight of this stat for the build"
+              },
+              "weightedValue": {
+                "type": "number",
+                "description": "value * weight — the contribution to the overall score"
+              }
+            }
+          }
+        },
+        "meetsRequirements": {
+          "type": "boolean",
+          "description": "Whether the character can equip this item"
+        },
+        "unmetRequirements": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of requirements the character doesn't meet"
+        },
+        "isUpgrade": {
+          "type": "boolean",
+          "description": "True if this item improves DPS or EHP over current gear"
+        }
+      }
+    },
+    "PriceAnalysis": {
+      "type": "object",
+      "required": ["currentPrice", "marketAverage", "priceRatio"],
+      "properties": {
+        "currentPrice": {
+          "$ref": "#/definitions/NormalizedPrice",
+          "description": "Listing price normalized to exalted orbs"
+        },
+        "marketAverage": {
+          "$ref": "#/definitions/NormalizedPrice",
+          "description": "Historical market average for similar items"
+        },
+        "priceRatio": {
+          "type": "number",
+          "description": "currentPrice / marketAverage. Below 0.8 = good deal."
+        },
+        "sampleSize": {
+          "type": "integer",
+          "description": "Number of data points in the market average"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence in the market average (0-1). Based on sample size."
+        }
+      }
+    },
+    "NormalizedPrice": {
+      "type": "object",
+      "required": ["amount", "currency", "originalPrice"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "description": "Price in exalted orbs (normalized base currency)"
+        },
+        "currency": {
+          "type": "string",
+          "const": "exalted"
+        },
+        "originalPrice": {
+          "$ref": "#/definitions/Price",
+          "description": "The original price before normalization"
+        }
+      }
+    },
+    "AIAnalysis": {
+      "type": "object",
+      "description": "LLM-generated analysis for complex rare items",
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": ["S", "A", "B", "C", "D", "F"],
+          "description": "S=must-buy, A=significant upgrade, B=solid, C=marginal, D=skip, F=bad"
+        },
+        "reasoning": {
+          "type": "string",
+          "description": "1-2 sentence explanation of the rating"
+        },
+        "synergies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Identified synergies with the build (e.g., 'phys damage scales with your Monk ascendancy')"
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Concerns or caveats (e.g., 'no life roll', 'wrong resistance type')"
+        }
+      }
+    }
+  }
+}
