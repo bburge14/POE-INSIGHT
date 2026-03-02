@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('exileInsight', {
   // Build management
   importBuild: (pobCode: string) => ipcRenderer.send('build:import', pobCode),
   onBuildUpdate: (callback: (data: unknown) => void) =>
-    ipcRenderer.on('build:update', (_event, data) => callback(data)),
+    ipcRenderer.on('build:update', (_event: unknown, data: unknown) => callback(data)),
 
   // Monitoring
   startMonitoring: () => ipcRenderer.send('monitor:start'),
@@ -16,11 +16,11 @@ contextBridge.exposeInMainWorld('exileInsight', {
 
   // Deals
   onDealsUpdate: (callback: (deals: unknown[]) => void) =>
-    ipcRenderer.on('deals:update', (_event, deals) => callback(deals)),
+    ipcRenderer.on('deals:update', (_event: unknown, deals: unknown[]) => callback(deals)),
 
   // Status
   onStatusUpdate: (callback: (status: unknown) => void) =>
-    ipcRenderer.on('status:update', (_event, status) => callback(status)),
+    ipcRenderer.on('status:update', (_event: unknown, status: unknown) => callback(status)),
 
   // Config
   updateConfig: (config: Record<string, unknown>) =>

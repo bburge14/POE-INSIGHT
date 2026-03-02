@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('exileInsight', {
 
   // Receive price check results from the main process
   onPriceCheckResult: (callback: (data: unknown) => void) => {
-    ipcRenderer.on('price-check:result', (_event, data) => callback(data));
+    ipcRenderer.on('price-check:result', (_event: unknown, data: unknown) => callback(data));
   },
 
   // Open a URL in the user's default browser

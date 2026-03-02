@@ -9,7 +9,6 @@ import {
   EquippedItem,
   DealEvaluation,
   StatContribution,
-  Mod,
 } from '../models/types';
 
 /**
@@ -481,6 +480,39 @@ export class BuildEvaluator {
       default:
         return 1;
     }
+  }
+
+  /**
+   * Identify which equipment slots have the biggest upgrade potential.
+   * Empty slots and slots with low-tier items get priority.
+   */
+  private identifyPrioritySlots(build: CharacterBuild): ItemSlot[] {
+    const allSlots: ItemSlot[] = [
+      'helm', 'body', 'gloves', 'boots', 'belt',
+      'amulet', 'ring1', 'ring2', 'weapon1', 'offhand1',
+    ];
+
+    const slotScores: Array<{ slot: ItemSlot; score: number }> = [];
+
+    for (const slot of allSlots) {
+      const equipped = build.equipped.find(e => e.slot === slot);
+
+      if (!equipped || !equipped.item) {
+        // Empty slot = highest priority
+        slotScores.push({ slot, score: 100 });
+        continue;
+      }
+
+      // Score based on rarity (lower rarity = more room for upgrade)
+      const rarityScore: Record<string, number> = {
+        'Normal': 80, 'Magic': 60, 'Rare': 20, 'Unique': 10,
+      };
+      const score = rarityScore[equipped.item.rarity] || 30;
+      slotScores.push({ slot, score });
+    }
+
+    slotScores.sort((a, b) => b.score - a.score);
+    return slotScores.filter(s => s.score >= 20).map(s => s.slot);
   }
 
   private getAttributeRequirement(build: CharacterBuild, attr: 'str' | 'dex' | 'int'): number {
