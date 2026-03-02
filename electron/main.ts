@@ -9,6 +9,7 @@ import { UIOverlay } from './modules/ui-overlay';
 import { StreamBuffer } from './utils/stream-buffer';
 import { DEFAULT_CONFIG } from './config/defaults';
 import { AppConfig, PoE2Item, ItemDeal } from './models/types';
+import axios from 'axios';
 
 /**
  * Exile-Insight: Main Application Controller
@@ -18,7 +19,7 @@ import { AppConfig, PoE2Item, ItemDeal } from './models/types';
  * - DataFetcher → StreamBuffer → ItemEvaluator
  * - MarketDatabase (persistence)
  * - AIAdvisor (optional LLM layer)
- * - UIOverlay (Electron window)
+ * - UIOverlay (Electron window + price check overlay)
  *
  * COMPLIANCE: Strictly READ-ONLY. No automated game interaction.
  */
@@ -35,6 +36,9 @@ class ExileInsightApp {
 
   private totalItemsProcessed: number = 0;
   private isMonitoring: boolean = false;
+
+  // The Express server port for the web app API
+  private readonly apiPort: number = parseInt(process.env.PORT || '5000', 10);
 
   constructor() {
     this.config = { ...DEFAULT_CONFIG };
@@ -103,6 +107,9 @@ class ExileInsightApp {
     this.ui.on('update-config', (config: Partial<AppConfig>) => this.updateConfig(config));
     this.ui.on('closed', () => this.shutdown());
 
+    // Price check overlay: triggered by Ctrl+D hotkey
+    this.ui.on('price-check', (rawText: string) => this.handlePriceCheck(rawText));
+
     // DataFetcher → StreamBuffer
     this.dataFetcher.on('items', (items: PoE2Item[]) => {
       this.streamBuffer.push(items);
@@ -111,10 +118,7 @@ class ExileInsightApp {
     // DataFetcher status events
     this.dataFetcher.on('poll', (info: { changeId: string; itemCount: number }) => {
       this.totalItemsProcessed += info.itemCount;
-
-      // Persist the change_id for resume
       this.database.savePollState('change_id', info.changeId);
-
       this.ui.updateStatus({
         polling: true,
         changeId: info.changeId,
@@ -139,6 +143,51 @@ class ExileInsightApp {
         itemsProcessed: this.totalItemsProcessed,
       });
     });
+  }
+
+  /**
+   * Handle a price check request from the overlay.
+   * Calls the existing Express API server to evaluate the clipboard item text.
+   */
+  private async handlePriceCheck(rawText: string): Promise<void> {
+    console.log('Price check triggered, item text length:', rawText.length);
+
+    try {
+      // Step 1: Parse and evaluate via the Express API
+      const evalResponse = await axios.post(`http://localhost:${this.apiPort}/api/evaluate`, {
+        rawText,
+      }, {
+        timeout: 15000,
+      });
+
+      const { parsed, evaluation } = evalResponse.data;
+
+      // Step 2: Fetch trade data using the parsed item
+      let tradeData = null;
+      try {
+        const tradeResponse = await axios.post(`http://localhost:${this.apiPort}/api/trade/search`, {
+          parsed,
+          league: 'Standard',
+        }, {
+          timeout: 10000,
+        });
+        tradeData = tradeResponse.data;
+      } catch (tradeErr) {
+        console.warn('Trade search failed (non-fatal):', (tradeErr as Error).message);
+      }
+
+      // Send combined results to the overlay
+      this.ui.sendPriceCheckResult({
+        parsed,
+        evaluation,
+        trade: tradeData,
+      });
+    } catch (err) {
+      console.error('Price check failed:', (err as Error).message);
+      this.ui.sendPriceCheckResult({
+        error: `Price check failed: ${(err as Error).message}`,
+      });
+    }
   }
 
   /**
@@ -181,11 +230,8 @@ class ExileInsightApp {
     }
 
     this.isMonitoring = true;
-
-    // Start the stream buffer flush timer
     this.streamBuffer.start();
 
-    // Start polling the API
     const lastChangeId = this.database.getPollState('change_id') || undefined;
     await this.dataFetcher.start(lastChangeId);
 
@@ -209,7 +255,6 @@ class ExileInsightApp {
 
   /**
    * Handle a batch of items flushed from the stream buffer.
-   * This is the main evaluation pipeline.
    */
   private async onBufferFlush(items: PoE2Item[]): Promise<void> {
     if (items.length === 0) return;
@@ -242,6 +287,7 @@ class ExileInsightApp {
   private shutdown(): void {
     console.log('Shutting down...');
     this.stopMonitoring();
+    this.ui.unregisterHotkeys();
     this.database.close();
   }
 }
@@ -257,4 +303,10 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   app.quit();
+});
+
+app.on('will-quit', () => {
+  // Clean up global shortcuts when app quits
+  const { globalShortcut } = require('electron');
+  globalShortcut.unregisterAll();
 });
