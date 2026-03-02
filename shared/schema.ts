@@ -129,14 +129,33 @@ export interface ItemEvaluation {
   aiAnalysis?: AIItemAnalysis;
 }
 
+export interface AICraftingPlanStep {
+  step: number;
+  action: string;
+  currency: string;
+  reason: string;
+  risk?: "low" | "medium" | "high";
+  estimatedCost?: string;
+}
+
+export interface AICraftingPlan {
+  summary: string;
+  steps: AICraftingPlanStep[];
+  targetMods?: string[];
+  estimatedTotalCost?: string;
+  stopCondition?: string;
+}
+
 export interface AIItemAnalysis {
   verdict: string;
   reasoning: string;
   synergies: string[];
   warnings: string[];
   craftingTips: string[];
+  craftingPlan?: AICraftingPlan;
   estimatedTier: "S" | "A" | "B" | "C" | "D" | "F";
   keepForBuilds: string[];
+  craftOfExileUrl?: string;
 }
 
 export interface NinjaCurrency {
