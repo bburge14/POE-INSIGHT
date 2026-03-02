@@ -1,5 +1,5 @@
 {
-  "include": ["client/src/**/*", "shared/**/*", "server/**/*", "src/**/*"],
+  "include": ["client/src/**/*", "shared/**/*", "server/**/*", "electron/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "incremental": true,
@@ -18,11 +18,11 @@
     "paths": {
       "@/*": ["./client/src/*"],
       "@shared/*": ["./shared/*"],
-      "@core/*": ["./src/core/*"],
-      "@models/*": ["./src/models/*"],
-      "@modules/*": ["./src/modules/*"],
-      "@utils/*": ["./src/utils/*"],
-      "@config/*": ["./src/config/*"]
+      "@core/*": ["./electron/core/*"],
+      "@models/*": ["./electron/models/*"],
+      "@modules/*": ["./electron/modules/*"],
+      "@utils/*": ["./electron/utils/*"],
+      "@config/*": ["./electron/config/*"]
     }
   }
 }

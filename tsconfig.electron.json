@@ -4,7 +4,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "./dist-electron",
-    "rootDir": "./src",
+    "rootDir": "./electron",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,13 +13,13 @@
     "declaration": false,
     "sourceMap": true,
     "paths": {
-      "@core/*": ["./src/core/*"],
-      "@models/*": ["./src/models/*"],
-      "@modules/*": ["./src/modules/*"],
-      "@utils/*": ["./src/utils/*"],
-      "@config/*": ["./src/config/*"]
+      "@core/*": ["./electron/core/*"],
+      "@models/*": ["./electron/models/*"],
+      "@modules/*": ["./electron/modules/*"],
+      "@utils/*": ["./electron/utils/*"],
+      "@config/*": ["./electron/config/*"]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["electron/**/*.ts"],
   "exclude": ["node_modules", "client", "server", "shared"]
 }
