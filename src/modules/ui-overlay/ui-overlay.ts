@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain } from 'electron';
+import { BrowserWindow, app, ipcMain, globalShortcut, screen, shell, clipboard } from 'electron';
 import * as path from 'path';
 import { EventEmitter } from 'events';
 import { ItemDeal, BuildProfile } from '../../models/types';
@@ -6,20 +6,22 @@ import { ItemDeal, BuildProfile } from '../../models/types';
 /**
  * UIOverlay: Electron-based desktop overlay for Exile-Insight.
  *
- * Design: Dark-mode, high-contrast aesthetic similar to modern fintech dashboards.
- * Uses Tailwind CSS for styling.
+ * Two windows:
+ * 1. Main dashboard window (full app with build/deal monitoring)
+ * 2. Price check overlay (transparent, always-on-top popup triggered by Ctrl+D)
  *
- * Displays:
- * - Top 5 deals found in the last 10-second window
- * - Build profile summary with unmet requirements highlighted
- * - Deal details with stat breakdowns and AI analysis
- * - Real-time polling status and rate limit indicators
+ * Global Hotkeys:
+ * - Ctrl+D: Read clipboard and trigger price check
+ * - Ctrl+Shift+D: Toggle overlay visibility
+ * - Escape (in overlay): Close overlay
  */
 export class UIOverlay extends EventEmitter {
   private mainWindow: BrowserWindow | null = null;
+  private overlayWindow: BrowserWindow | null = null;
+  private overlayVisible: boolean = false;
 
   /**
-   * Initialize the Electron window.
+   * Initialize the main Electron window.
    */
   async createWindow(): Promise<void> {
     this.mainWindow = new BrowserWindow({
@@ -34,7 +36,6 @@ export class UIOverlay extends EventEmitter {
         contextIsolation: true,
         preload: path.join(__dirname, 'preload.js'),
       },
-      // Overlay-friendly settings
       frame: true,
       transparent: false,
       autoHideMenuBar: true,
@@ -43,23 +44,170 @@ export class UIOverlay extends EventEmitter {
     await this.mainWindow.loadFile(path.join(__dirname, '../../public/index.html'));
 
     this.setupIPC();
+    this.registerGlobalHotkeys();
 
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
+      this.destroyOverlay();
       this.emit('closed');
     });
   }
 
   /**
-   * Send the latest deals to the UI.
+   * Create the transparent price check overlay window.
+   * This is a frameless, always-on-top, transparent window that appears
+   * near the cursor when the user triggers a price check.
    */
+  private async createOverlayWindow(): Promise<void> {
+    if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
+      return;
+    }
+
+    this.overlayWindow = new BrowserWindow({
+      width: 420,
+      height: 500,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      focusable: true,
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'overlay-preload.js'),
+      },
+    });
+
+    // Prevent the overlay from stealing focus from the game
+    this.overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+
+    await this.overlayWindow.loadFile(path.join(__dirname, '../../public/overlay.html'));
+
+    this.overlayWindow.on('closed', () => {
+      this.overlayWindow = null;
+      this.overlayVisible = false;
+    });
+
+    // Hide on blur so clicking elsewhere dismisses it
+    this.overlayWindow.on('blur', () => {
+      this.hideOverlay();
+    });
+  }
+
+  /**
+   * Show the overlay near the cursor position with a loading state,
+   * then trigger the price check pipeline.
+   */
+  async showPriceCheck(): Promise<void> {
+    // Read clipboard
+    const clipboardText = clipboard.readText();
+    if (!clipboardText || !clipboardText.trim()) {
+      return;
+    }
+
+    // Create overlay window if it doesn't exist
+    await this.createOverlayWindow();
+    if (!this.overlayWindow) return;
+
+    // Position overlay near cursor
+    const cursorPos = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursorPos);
+    const bounds = display.workArea;
+
+    // Offset slightly from cursor, keep within screen bounds
+    let x = cursorPos.x + 15;
+    let y = cursorPos.y + 15;
+
+    // Prevent going off-screen
+    if (x + 420 > bounds.x + bounds.width) {
+      x = cursorPos.x - 435;
+    }
+    if (y + 500 > bounds.y + bounds.height) {
+      y = bounds.y + bounds.height - 510;
+    }
+    if (x < bounds.x) x = bounds.x + 5;
+    if (y < bounds.y) y = bounds.y + 5;
+
+    this.overlayWindow.setPosition(Math.round(x), Math.round(y));
+    this.overlayWindow.show();
+    this.overlayVisible = true;
+
+    // Emit event so main.ts can trigger the price check pipeline
+    this.emit('price-check', clipboardText);
+  }
+
+  /**
+   * Send price check results to the overlay window.
+   */
+  sendPriceCheckResult(data: unknown): void {
+    if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
+      this.overlayWindow.webContents.send('price-check:result', data);
+    }
+  }
+
+  /**
+   * Hide the overlay window.
+   */
+  hideOverlay(): void {
+    if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
+      this.overlayWindow.hide();
+      this.overlayVisible = false;
+    }
+  }
+
+  /**
+   * Toggle overlay visibility.
+   */
+  toggleOverlay(): void {
+    if (this.overlayVisible) {
+      this.hideOverlay();
+    } else {
+      // Show with last results or trigger new check
+      this.showPriceCheck();
+    }
+  }
+
+  /**
+   * Destroy the overlay window completely.
+   */
+  private destroyOverlay(): void {
+    if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
+      this.overlayWindow.destroy();
+    }
+    this.overlayWindow = null;
+    this.overlayVisible = false;
+  }
+
+  /**
+   * Register global hotkeys that work even when the game has focus.
+   */
+  private registerGlobalHotkeys(): void {
+    // Ctrl+D: Price check (read clipboard + show overlay)
+    globalShortcut.register('CommandOrControl+D', () => {
+      this.showPriceCheck();
+    });
+
+    // Ctrl+Shift+D: Toggle overlay visibility
+    globalShortcut.register('CommandOrControl+Shift+D', () => {
+      this.toggleOverlay();
+    });
+  }
+
+  /**
+   * Unregister all global hotkeys (call on shutdown).
+   */
+  unregisterHotkeys(): void {
+    globalShortcut.unregisterAll();
+  }
+
+  // ---- Main Dashboard Window Methods (unchanged) ----
+
   updateDeals(deals: ItemDeal[]): void {
     this.sendToRenderer('deals:update', deals.map(d => this.serializeDeal(d)));
   }
 
-  /**
-   * Send the build profile to the UI for display.
-   */
   updateBuildProfile(profile: BuildProfile): void {
     this.sendToRenderer('build:update', {
       name: profile.build.name,
@@ -74,9 +222,6 @@ export class UIOverlay extends EventEmitter {
     });
   }
 
-  /**
-   * Update the polling status indicator.
-   */
   updateStatus(status: {
     polling: boolean;
     changeId?: string;
@@ -102,6 +247,17 @@ export class UIOverlay extends EventEmitter {
 
     ipcMain.on('config:update', (_event, config: Record<string, unknown>) => {
       this.emit('update-config', config);
+    });
+
+    // Overlay IPC
+    ipcMain.on('overlay:close', () => {
+      this.hideOverlay();
+    });
+
+    ipcMain.on('overlay:open-external', (_event, url: string) => {
+      if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+        shell.openExternal(url);
+      }
     });
   }
 
