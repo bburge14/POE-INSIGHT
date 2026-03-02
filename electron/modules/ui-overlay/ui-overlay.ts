@@ -233,7 +233,7 @@ export class UIOverlay extends EventEmitter {
   }
 
   private setupIPC(): void {
-    ipcMain.on('build:import', (_event, pobCode: string) => {
+    ipcMain.on('build:import', (_event: unknown, pobCode: string) => {
       this.emit('import-build', pobCode);
     });
 
@@ -245,7 +245,7 @@ export class UIOverlay extends EventEmitter {
       this.emit('stop-monitoring');
     });
 
-    ipcMain.on('config:update', (_event, config: Record<string, unknown>) => {
+    ipcMain.on('config:update', (_event: unknown, config: Record<string, unknown>) => {
       this.emit('update-config', config);
     });
 
@@ -254,7 +254,7 @@ export class UIOverlay extends EventEmitter {
       this.hideOverlay();
     });
 
-    ipcMain.on('overlay:open-external', (_event, url: string) => {
+    ipcMain.on('overlay:open-external', (_event: unknown, url: string) => {
       if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
         shell.openExternal(url);
       }

@@ -10,6 +10,7 @@ import {
   AppConfig,
   CurrencyType,
   ModStat,
+  AIAnalysis,
 } from '../../models/types';
 import { BuildEvaluator } from '../../core/build-evaluator';
 import { MarketDatabase } from '../database';
@@ -190,7 +191,7 @@ export class ItemEvaluator {
   private calculateDealScore(
     evaluation: DealEvaluation,
     pricing: PriceAnalysis,
-    aiAnalysis?: { tier: string } & Record<string, unknown>
+    aiAnalysis?: AIAnalysis
   ): number {
     let score = 0;
 
