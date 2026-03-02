@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Crosshair, TrendingUp, Settings, Bookmark, Swords, Shield } from "lucide-react";
+import { Crosshair, TrendingUp, Bookmark, Swords, Shield, Gem } from "lucide-react";
 import logoImage from "@assets/image_1771177688499.png";
 import {
   Sidebar,
@@ -33,16 +33,23 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <img src={logoImage} alt="Exile Insight" className="h-9 w-9 rounded-md object-cover" />
+          <div className="relative">
+            <img src={logoImage} alt="Exile Insight" className="h-10 w-10 rounded object-cover" />
+            <div className="absolute -inset-[1px] rounded border border-primary/20 pointer-events-none" />
+          </div>
           <div>
-            <h2 className="text-sm font-semibold tracking-tight" data-testid="text-app-title">Exile Insight</h2>
-            <p className="text-xs text-muted-foreground">Trade & Craft Tool</p>
+            <h2 className="text-sm font-bold tracking-wide text-primary" data-testid="text-app-title">
+              EXILE INSIGHT
+            </h2>
+            <p className="text-[10px] text-muted-foreground tracking-widest uppercase">Trade & Craft</p>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Tools</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] tracking-widest uppercase text-muted-foreground/60">
+            Tools
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
@@ -59,7 +66,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] tracking-widest uppercase text-muted-foreground/60">
+            Configuration
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {configItems.map((item) => (
@@ -78,8 +87,11 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline" className="text-xs">v1.0</Badge>
-          <span className="text-xs text-muted-foreground">poe.ninja powered</span>
+          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary/70">
+            <Gem className="h-2.5 w-2.5 mr-1" />
+            v1.0
+          </Badge>
+          <span className="text-[10px] text-muted-foreground/50">poe.ninja powered</span>
         </div>
       </SidebarFooter>
     </Sidebar>

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, XCircle, AlertTriangle, Star, Flame, Hammer, ShoppingCart, Archive, HelpCircle, ArrowRight, Coins, Wrench, Users, ExternalLink, Brain, Lightbulb, AlertOctagon, Sparkles } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, Star, Flame, Hammer, ShoppingCart, Archive, HelpCircle, ArrowRight, Coins, Wrench, Users, ExternalLink, Brain, Lightbulb, AlertOctagon, Sparkles, Target, DollarSign, StopCircle, Shield } from "lucide-react";
 
 interface ItemDisplayProps {
   item: ParsedItem;
@@ -438,6 +438,87 @@ function AIAnalysisCard({ evaluation }: { evaluation: ItemEvaluation }) {
           </div>
         )}
 
+        {ai.craftingPlan && ai.craftingPlan.steps.length > 0 && (
+          <div className="border border-blue-800/40 rounded-md p-3 bg-blue-950/20">
+            <p className="text-xs font-semibold text-blue-300 flex items-center gap-1 mb-2">
+              <Hammer className="h-3 w-3" /> Crafting Plan
+            </p>
+            <p className="text-xs text-blue-200/80 mb-3">{ai.craftingPlan.summary}</p>
+
+            <div className="space-y-2.5">
+              {ai.craftingPlan.steps.map((step, i) => (
+                <div key={i} className="flex gap-2.5">
+                  <div className="flex flex-col items-center">
+                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-900/60 text-[10px] font-bold text-blue-300 shrink-0">
+                      {step.step}
+                    </div>
+                    {i < ai.craftingPlan!.steps.length - 1 && (
+                      <div className="w-px h-full bg-blue-800/40 mt-1" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 pb-1">
+                    <p className="text-xs font-medium text-blue-100">{step.action}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <Badge variant="secondary" className="text-[10px] gap-1 bg-blue-900/40 text-blue-300 border-blue-700/40">
+                        {step.currency}
+                      </Badge>
+                      {step.risk && (
+                        <Badge className={`text-[10px] ${
+                          step.risk === "low" ? "bg-green-900/40 text-green-300 border-green-700/40" :
+                          step.risk === "medium" ? "bg-yellow-900/40 text-yellow-300 border-yellow-700/40" :
+                          "bg-red-900/40 text-red-300 border-red-700/40"
+                        }`}>
+                          <Shield className="h-2.5 w-2.5 mr-0.5" />
+                          {step.risk} risk
+                        </Badge>
+                      )}
+                      {step.estimatedCost && (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                          <DollarSign className="h-2.5 w-2.5" />
+                          {step.estimatedCost}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">{step.reason}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {(ai.craftingPlan.targetMods?.length || ai.craftingPlan.estimatedTotalCost || ai.craftingPlan.stopCondition) && (
+              <div className="mt-3 pt-2 border-t border-blue-800/30 space-y-1.5">
+                {ai.craftingPlan.targetMods && ai.craftingPlan.targetMods.length > 0 && (
+                  <div className="flex items-start gap-1.5">
+                    <Target className="h-3 w-3 mt-0.5 shrink-0 text-green-400" />
+                    <div className="text-[10px] text-muted-foreground">
+                      <span className="text-green-400 font-medium">Target: </span>
+                      {ai.craftingPlan.targetMods.join(", ")}
+                    </div>
+                  </div>
+                )}
+                {ai.craftingPlan.estimatedTotalCost && (
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="h-3 w-3 shrink-0 text-primary" />
+                    <span className="text-[10px] text-muted-foreground">
+                      <span className="text-primary font-medium">Est. cost: </span>
+                      {ai.craftingPlan.estimatedTotalCost}
+                    </span>
+                  </div>
+                )}
+                {ai.craftingPlan.stopCondition && (
+                  <div className="flex items-start gap-1.5">
+                    <StopCircle className="h-3 w-3 mt-0.5 shrink-0 text-red-400" />
+                    <span className="text-[10px] text-muted-foreground">
+                      <span className="text-red-400 font-medium">Stop when: </span>
+                      {ai.craftingPlan.stopCondition}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {ai.keepForBuilds.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-1">
             {ai.keepForBuilds.map((build, i) => (
@@ -448,7 +529,17 @@ function AIAnalysisCard({ evaluation }: { evaluation: ItemEvaluation }) {
           </div>
         )}
 
-        <p className="text-[10px] text-purple-500 pt-1">Powered by GPT-4o</p>
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[10px] text-purple-500">Powered by GPT-4o</p>
+          {ai.craftOfExileUrl && (
+            <Button size="sm" variant="ghost" asChild className="h-6 text-[10px] text-blue-400 hover:text-blue-300">
+              <a href={ai.craftOfExileUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-3 w-3 mr-1" />
+                Simulate on Craft of Exile
+              </a>
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

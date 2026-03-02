@@ -179,63 +179,125 @@ function isWeapon(item: ParsedItem): boolean {
   );
 }
 
+function hasGoodDamageMods(mods: string[]): boolean {
+  return mods.some(m => /physical damage|spell damage|elemental damage|fire damage|cold damage|lightning damage|chaos damage|adds \d+/i.test(m));
+}
+
+function hasCritMods(mods: string[]): boolean {
+  return mods.some(m => /critical strike|critical hit|critical damage/i.test(m));
+}
+
+function hasSpeedMods(mods: string[]): boolean {
+  return mods.some(m => /attack speed|cast speed/i.test(m));
+}
+
 function generateCraftingAdvice(item: ParsedItem, metaBase: MetaBase | undefined, score: number, activeProfile?: BuildProfile | null): CraftingStep[] {
   const steps: CraftingStep[] = [];
   const openSlots = countOpenModSlots(item);
   const hasLife = hasLifeMod(item.explicitMods);
   const lifeVal = getLifeValue(item.explicitMods);
   const resCount = countResistanceMods(item.explicitMods);
+  const hasDamage = hasGoodDamageMods(item.explicitMods);
+  const hasCrit = hasCritMods(item.explicitMods);
+  const hasSpeed = hasSpeedMods(item.explicitMods);
+
+  if (item.corrupted) {
+    steps.push({
+      step: 1,
+      action: "No further crafting possible — item is corrupted",
+      reason: "Corrupted items cannot be modified. Evaluate as-is for your build or sell."
+    });
+    return steps;
+  }
 
   if (item.rarity === "Normal") {
-    if (metaBase && item.itemLevel >= 80) {
+    if (metaBase && item.itemLevel >= 84) {
       steps.push({
         step: 1,
-        action: "Use Orb of Alchemy to make it Rare",
-        currency: "Orb of Alchemy",
-        reason: "This is a top-tier base with high item level. Alching it is the first step to potentially great gear."
+        action: "Use Essences for targeted crafting (recommended) or Alt-spam for specific mods",
+        currency: "Essence / Orb of Alteration",
+        reason: "This is a top-tier meta base at iLvl 84+, unlocking the highest mod tiers. Essences guarantee one good mod. Alt-spam lets you fish for a specific T1 mod before Regal."
       });
       steps.push({
         step: 2,
-        action: "Check the resulting mods — if bad, use Chaos Orbs to reroll",
-        currency: "Chaos Orb",
-        reason: "Keep rerolling until you hit at least life + 2 resistances, or mods your build needs."
+        action: "If using Alts: Augment if you hit 1 good mod, then Regal Orb to Rare",
+        currency: "Orb of Augmentation → Regal Orb",
+        reason: "Alt + Aug + Regal gives you up to 3 targeted mods. This is more controlled than Chaos spam."
       });
       steps.push({
         step: 3,
-        action: "If you hit 3-4 good mods, consider using Exalted Orb to fill remaining slots",
-        currency: "Exalted Orb",
-        reason: "Only slam if the existing mods are already strong — don't waste Exalts on mediocre items."
+        action: "Fill remaining slots with Crafting Bench mods or Exalted Orbs",
+        currency: "Crafting Bench / Exalted Orb",
+        reason: "Bench craft for guaranteed mods (life, res, damage). Exalt only if 3+ existing mods are strong."
       });
-    } else if (item.itemLevel >= 80) {
+    } else if (metaBase && item.itemLevel >= 80) {
       steps.push({
         step: 1,
-        action: "Use Orb of Alchemy and check results",
+        action: "Use Orb of Alchemy or Essences to make it Rare",
+        currency: "Orb of Alchemy / Essence",
+        reason: "Good meta base at iLvl 80+. Alchemy is budget-friendly, Essences give a guaranteed mod."
+      });
+      steps.push({
+        step: 2,
+        action: "If mods are bad, Chaos Orb reroll. If 2+ good mods, bench craft the rest",
+        currency: "Chaos Orb / Crafting Bench",
+        reason: "Don't over-invest. Chaos spam is cheap. Stop when you hit a usable combination."
+      });
+    } else if (item.itemLevel >= 75) {
+      steps.push({
+        step: 1,
+        action: "Orb of Alchemy — budget craft only",
         currency: "Orb of Alchemy",
-        reason: "High item level means you can roll good mod tiers, even on a non-meta base."
+        reason: "Decent item level but not top-tier. Alch and use if the mods are okay, don't invest further."
       });
     } else {
       steps.push({
         step: 1,
-        action: "Not recommended for crafting",
-        reason: "Low item level limits the mod tiers you can roll. Save your currency for better bases."
+        action: "Not worth crafting — save your currency",
+        reason: "Item level too low for good mod tiers. Vendor or skip."
       });
     }
     return steps;
   }
 
   if (item.rarity === "Magic") {
-    if (metaBase && item.itemLevel >= 80) {
+    const modCount = item.explicitMods.length;
+    const hasGreatMod = item.explicitMods.some(m => getModValueQuality(m) >= 0.75);
+
+    if (hasGreatMod && item.itemLevel >= 75) {
+      if (modCount < 2) {
+        steps.push({
+          step: 1,
+          action: "Augment to add a second mod before upgrading",
+          currency: "Orb of Augmentation",
+          reason: "You have a strong mod — add a second one for free before committing to Regal."
+        });
+      }
       steps.push({
-        step: 1,
-        action: "Use Regal Orb to upgrade to Rare",
+        step: steps.length + 1,
+        action: "Regal Orb to upgrade to Rare",
         currency: "Regal Orb",
-        reason: "Good base with decent magic mods — upgrade to Rare to add more modifiers."
+        reason: "Strong magic mods are a great foundation. Regal adds a third mod and opens up bench crafting."
       });
       steps.push({
-        step: 2,
-        action: "If the Regal adds a good mod, consider Exalted Orbs or crafting bench",
-        currency: "Exalted Orb",
-        reason: "Build on the strong foundation. Use crafting bench for guaranteed mods if you have open slots."
+        step: steps.length + 1,
+        action: "If Regal hits well, bench craft remaining slots. If bad, Annul the bad mod (risky)",
+        currency: "Crafting Bench / Orb of Annulment",
+        reason: "Bench craft is safe. Annulment is a gamble — only if the Regal mod is terrible and other mods are great."
+      });
+    } else if (metaBase && item.itemLevel >= 80) {
+      steps.push({
+        step: 1,
+        action: "Regal Orb to Rare, then evaluate",
+        currency: "Regal Orb",
+        reason: "Meta base is worth upgrading. Check what the Regal adds before investing more."
+      });
+    } else {
+      steps.push({
+        step: 1,
+        action: "Consider Alt-spamming for better mods first",
+        currency: "Orb of Alteration",
+        reason: "Current mods aren't strong enough to justify Regal. Reroll with Alts until you hit something good."
       });
     }
     return steps;
@@ -244,63 +306,147 @@ function generateCraftingAdvice(item: ParsedItem, metaBase: MetaBase | undefined
   if (item.rarity === "Rare") {
     const totalOpen = openSlots.prefixes + openSlots.suffixes;
 
-    if (totalOpen > 0 && score >= 40) {
-      if (!hasLife && isDefensiveItem(item)) {
+    // Excellent item — fine-tune or sell
+    if (score >= 70) {
+      if (totalOpen > 0) {
+        // Recommend specific bench crafts based on what's missing
+        if (!hasLife && isDefensiveItem(item) && openSlots.prefixes > 0) {
+          steps.push({
+            step: steps.length + 1,
+            action: "Bench craft Maximum Life (prefix)",
+            currency: "Crafting Bench",
+            reason: "Strong item missing life. Bench crafting life is the safest way to round it out."
+          });
+        } else if (!hasDamage && isWeapon(item) && openSlots.prefixes > 0) {
+          steps.push({
+            step: steps.length + 1,
+            action: "Bench craft flat damage or %increased damage (prefix)",
+            currency: "Crafting Bench",
+            reason: "Weapon with open prefix — add damage to maximize DPS."
+          });
+        }
+        if (resCount < 2 && isDefensiveItem(item) && openSlots.suffixes > 0) {
+          steps.push({
+            step: steps.length + 1,
+            action: "Bench craft your weakest resistance (suffix)",
+            currency: "Crafting Bench",
+            reason: "Fill the open suffix with whichever resistance you need to cap."
+          });
+        } else if (!hasSpeed && isWeapon(item) && openSlots.suffixes > 0) {
+          steps.push({
+            step: steps.length + 1,
+            action: "Bench craft Attack/Cast Speed (suffix)",
+            currency: "Crafting Bench",
+            reason: "Speed is a huge DPS multiplier on weapons."
+          });
+        } else if (!hasCrit && openSlots.suffixes > 0) {
+          steps.push({
+            step: steps.length + 1,
+            action: "Bench craft Critical Strike Chance (suffix)",
+            currency: "Crafting Bench",
+            reason: "Crit scales well with existing damage mods."
+          });
+        }
+        if (totalOpen >= 2 && score >= 75) {
+          steps.push({
+            step: steps.length + 1,
+            action: "Consider Exalted Orb slam on remaining open slot",
+            currency: "Exalted Orb",
+            reason: "Existing mods are strong enough to justify the gamble. Use Omens to bias prefix/suffix if available."
+          });
+        }
+      }
+
+      // Check if Divine Orb could help
+      const hasLowRolls = item.explicitMods.some(m => getModValueQuality(m) <= 0.5);
+      if (hasLowRolls && item.explicitMods.length >= 4) {
         steps.push({
           step: steps.length + 1,
-          action: "Craft Life on the crafting bench",
-          currency: "Crafting Bench",
-          reason: "Life is essential on armor pieces. Use the bench to guarantee a life roll in the open prefix."
+          action: "Consider Divine Orb to reroll mod values higher",
+          currency: "Divine Orb",
+          reason: "The mod types are good but some values rolled low. Divine Orbs reroll the numbers without changing mod types."
         });
       }
-      if (resCount < 2 && isDefensiveItem(item)) {
+
+      if (steps.length === 0) {
         steps.push({
-          step: steps.length + 1,
-          action: "Craft a resistance on the crafting bench",
-          currency: "Crafting Bench",
-          reason: "Capping resistances is crucial. Fill an open suffix with whichever resistance you need."
-        });
-      }
-      if (totalOpen >= 2 && score >= 55) {
-        steps.push({
-          step: steps.length + 1,
-          action: "Consider using an Exalted Orb on an open slot",
-          currency: "Exalted Orb",
-          reason: "The existing mods are strong enough to justify gambling on an Exalted slam."
+          step: 1,
+          action: "Item is already in great shape — use as-is or sell",
+          reason: "Strong mods with no easy improvements. Sell at market value or use for your build."
         });
       }
     }
-
-    if (score < 30 && item.explicitMods.length >= 4) {
+    // Mid-tier item — craft to improve
+    else if (score >= 40 && totalOpen > 0) {
+      if (!hasLife && isDefensiveItem(item) && openSlots.prefixes > 0) {
+        steps.push({
+          step: steps.length + 1,
+          action: "Bench craft Maximum Life (prefix)",
+          currency: "Crafting Bench",
+          reason: "Life is essential on armor. Guaranteed life roll from bench is the best bang for your buck."
+        });
+      }
+      if (resCount < 2 && isDefensiveItem(item) && openSlots.suffixes > 0) {
+        steps.push({
+          step: steps.length + 1,
+          action: "Bench craft a resistance (suffix)",
+          currency: "Crafting Bench",
+          reason: "Capping resistances is top priority for survivability."
+        });
+      }
+      if (!hasDamage && isWeapon(item) && openSlots.prefixes > 0) {
+        steps.push({
+          step: steps.length + 1,
+          action: "Bench craft damage (prefix)",
+          currency: "Crafting Bench",
+          reason: "Open prefix on a weapon — add damage to make it usable."
+        });
+      }
+      if (steps.length === 0 && totalOpen > 0) {
+        steps.push({
+          step: steps.length + 1,
+          action: "Bench craft a useful mod for your build",
+          currency: "Crafting Bench",
+          reason: "Open slots available. Check bench recipes and add whatever stat your build needs most."
+        });
+      }
+    }
+    // Bad rare on good base — reroll
+    else if (score < 30 && (metaBase || item.itemLevel >= 80)) {
       steps.push({
         step: 1,
-        action: "Use Chaos Orbs to reroll — current mods are weak",
+        action: "Chaos Orb spam to reroll all mods",
         currency: "Chaos Orb",
-        reason: "The base might be worth keeping, but these mods aren't useful. Chaos spam for better results."
+        reason: "Good base with bad mods. Chaos rerolling is cheap — look for Life + Res or damage combos."
       });
-    }
-
-    if (item.corrupted) {
       steps.push({
-        step: steps.length + 1,
-        action: "No further crafting possible — item is corrupted",
-        reason: "Corrupted items cannot be modified. What you see is what you get."
+        step: 2,
+        action: "Stop rerolling when you hit 3+ useful mods, then bench craft the rest",
+        currency: "Crafting Bench",
+        reason: "Don't chase perfection with Chaos. Get a decent foundation and finish with guaranteed bench mods."
       });
     }
-
-    if (steps.length === 0 && score >= 50) {
+    // Bad item — vendor
+    else if (score < 30) {
       steps.push({
         step: 1,
-        action: "Item is already in good shape — use as-is or sell",
-        reason: "The mods are solid for the score range. No major improvements available without risking what you have."
+        action: "Vendor — not worth the currency investment",
+        reason: "Low score with no redeeming qualities. Vendor for shards and move on."
       });
     }
-
-    if (steps.length === 0 && score < 50) {
+    // Mid item, fully modded
+    else if (steps.length === 0 && score >= 40) {
+      steps.push({
+        step: 1,
+        action: "Use as-is or sell — limited crafting upside",
+        reason: "Mods are decent but fully modded. Further investment would require Annulment gambles."
+      });
+    }
+    else if (steps.length === 0) {
       steps.push({
         step: 1,
         action: "Vendor or use as a temporary upgrade",
-        reason: "Not worth investing currency into. Mods are too scattered or weak to build on."
+        reason: "Not worth investing currency. Replace when you find something better."
       });
     }
   }
