@@ -158,32 +158,35 @@ export function parseItemText(raw: string): ParsedItem | null {
   };
 }
 
+// PoE-accurate rarity text colors
 export function getRarityColor(rarity: string): string {
   switch (rarity) {
-    case "Normal": return "text-gray-300";
-    case "Magic": return "text-blue-400";
-    case "Rare": return "text-yellow-400";
-    case "Unique": return "text-orange-400";
-    default: return "text-gray-300";
+    case "Normal": return "text-[#c8c8c8]";      // PoE Normal white-gray
+    case "Magic": return "text-[#8888ff]";         // PoE Magic blue
+    case "Rare": return "text-[#ffff77]";          // PoE Rare yellow
+    case "Unique": return "text-[#af6025]";        // PoE Unique orange-brown
+    default: return "text-[#c8c8c8]";
   }
 }
 
+// PoE-accurate rarity border colors
 export function getRarityBorderColor(rarity: string): string {
   switch (rarity) {
-    case "Normal": return "border-gray-600";
-    case "Magic": return "border-blue-600/50";
-    case "Rare": return "border-yellow-600/50";
-    case "Unique": return "border-orange-600/50";
-    default: return "border-gray-600";
+    case "Normal": return "border-[#c8c8c8]/20 poe-item-normal";
+    case "Magic": return "border-[#8888ff]/30 poe-item-magic";
+    case "Rare": return "border-[#ffff77]/25 poe-item-rare";
+    case "Unique": return "border-[#af6025]/35 poe-item-unique";
+    default: return "border-[#c8c8c8]/20 poe-item-normal";
   }
 }
 
+// PoE-style dark rarity background tints
 export function getRarityBgColor(rarity: string): string {
   switch (rarity) {
-    case "Normal": return "bg-gray-900/50";
-    case "Magic": return "bg-blue-950/30";
-    case "Rare": return "bg-yellow-950/30";
-    case "Unique": return "bg-orange-950/30";
-    default: return "bg-gray-900/50";
+    case "Normal": return "bg-[#1a1a1a]/60";
+    case "Magic": return "bg-[#0a0a2a]/50";
+    case "Rare": return "bg-[#1a1a0a]/50";
+    case "Unique": return "bg-[#1a0f05]/60";
+    default: return "bg-[#1a1a1a]/60";
   }
 }

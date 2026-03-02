@@ -62,12 +62,56 @@ export async function getCurrencies(league: string): Promise<NinjaCurrency[]> {
   }
 }
 
+const UNIQUE_ITEM_TYPES = [
+  "UniqueWeapon",
+  "UniqueArmour",
+  "UniqueAccessory",
+  "UniqueJewel",
+  "UniqueFlask",
+] as const;
+
+const UNIQUE_API_URL = "https://poe.ninja/api/data/itemoverview";
+
 export async function getUniqueItems(league: string): Promise<NinjaUniqueItem[]> {
-  return [];
+  const leagueSlug = leagueToSlug(league);
+  const allItems: NinjaUniqueItem[] = [];
+
+  for (const type of UNIQUE_ITEM_TYPES) {
+    try {
+      const data = await fetchWithCache<any>(UNIQUE_API_URL, {
+        league: leagueSlug,
+        type,
+      });
+
+      const lines = data.lines || [];
+      for (const line of lines) {
+        allItems.push({
+          id: line.id || 0,
+          name: line.name || "Unknown",
+          baseType: line.baseType || "",
+          icon: line.icon || "",
+          chaosValue: line.chaosValue || 0,
+          divineValue: line.divineValue || 0,
+          listingCount: line.listingCount || 0,
+        });
+      }
+    } catch (err: any) {
+      log(`Failed to fetch ${type} from poe.ninja: ${err.message}`, "ninja");
+    }
+  }
+
+  return allItems;
 }
 
 export async function findUniqueByName(name: string, league: string): Promise<NinjaUniqueItem | undefined> {
-  return undefined;
+  try {
+    const items = await getUniqueItems(league);
+    const nameLower = name.toLowerCase().trim();
+    return items.find(i => i.name.toLowerCase().trim() === nameLower);
+  } catch (err: any) {
+    log(`findUniqueByName error: ${err.message}`, "ninja");
+    return undefined;
+  }
 }
 
 function leagueToSlug(league: string): string {
@@ -428,7 +472,33 @@ function buildTradeQuery(parsed: ParsedItem, statFilters: TradeStatFilter[]): an
   return query;
 }
 
-async function tryTradeApiSearch(query: any, league: string): Promise<string | null> {
+interface TradeApiSearchResult {
+  id: string;
+  result: string[];
+  total: number;
+}
+
+interface TradeApiFetchItem {
+  id: string;
+  listing: {
+    price?: {
+      amount: number;
+      currency: string;
+    };
+    account: {
+      name: string;
+    };
+    indexed: string;
+  };
+  item: {
+    name?: string;
+    typeLine?: string;
+    explicitMods?: string[];
+    implicitMods?: string[];
+  };
+}
+
+async function tryTradeApiSearch(query: any, league: string): Promise<{ url: string; searchId: string; resultIds: string[]; total: number } | null> {
   try {
     const leaguePath = encodeURIComponent(league);
     const url = `https://www.pathofexile.com/api/trade2/search/poe2/${leaguePath}`;
@@ -445,16 +515,22 @@ async function tryTradeApiSearch(query: any, league: string): Promise<string | n
     });
 
     if (res.ok) {
-      const data = await res.json();
+      const data: TradeApiSearchResult = await res.json();
       if (data.id) {
         const leagueSlug = league === "Fate of the Vaal" ? "Fate+of+the+Vaal"
           : encodeURIComponent(league);
         const directUrl = `https://www.pathofexile.com/trade2/search/poe2/${leagueSlug}/${data.id}`;
-        log(`Trade API returned search ID: ${data.id}`, "trade");
-        return directUrl;
+        log(`Trade API returned search ID: ${data.id}, total: ${data.total}, results: ${data.result?.length || 0}`, "trade");
+        return {
+          url: directUrl,
+          searchId: data.id,
+          resultIds: data.result || [],
+          total: data.total || 0,
+        };
       }
     } else {
-      log(`Trade API returned ${res.status}: ${res.statusText}`, "trade");
+      const text = await res.text().catch(() => "");
+      log(`Trade API returned ${res.status}: ${res.statusText} - ${text.slice(0, 200)}`, "trade");
     }
   } catch (err: any) {
     log(`Trade API error: ${err.message}`, "trade");
@@ -462,50 +538,135 @@ async function tryTradeApiSearch(query: any, league: string): Promise<string | n
   return null;
 }
 
+async function fetchTradeListings(searchId: string, resultIds: string[], league: string): Promise<TradeListing[]> {
+  if (resultIds.length === 0) return [];
+
+  // Fetch up to 10 listings (API limit per request)
+  const idsToFetch = resultIds.slice(0, 10);
+  const idString = idsToFetch.join(",");
+
+  try {
+    const url = `https://www.pathofexile.com/api/trade2/fetch/${idString}?query=${searchId}`;
+    log(`Fetching ${idsToFetch.length} trade listings...`, "trade");
+
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "ExileInsight/1.0 (trade-advisor)",
+        "Accept": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      log(`Trade fetch returned ${res.status}: ${res.statusText}`, "trade");
+      return [];
+    }
+
+    const data = await res.json();
+    const results: TradeApiFetchItem[] = data.result || [];
+
+    return results
+      .filter((r: TradeApiFetchItem) => r.listing?.price)
+      .map((r: TradeApiFetchItem, i: number) => ({
+        id: r.id || `listing-${i}`,
+        price: {
+          amount: r.listing.price?.amount || 0,
+          currency: r.listing.price?.currency || "chaos",
+        },
+        seller: r.listing.account?.name || "Unknown",
+        listed: r.listing.indexed || "",
+        itemName: [r.item?.name, r.item?.typeLine].filter(Boolean).join(" ") || undefined,
+        itemMods: r.item?.explicitMods || undefined,
+      }));
+  } catch (err: any) {
+    log(`Trade fetch error: ${err.message}`, "trade");
+    return [];
+  }
+}
+
 export async function searchTrade(parsed: ParsedItem, league: string): Promise<TradeSearchResult> {
   const statFilters = buildStatFilters(parsed);
   const tradeQuery = buildTradeQuery(parsed, statFilters);
-  const listings: TradeListing[] = [];
+  let listings: TradeListing[] = [];
 
   let tradeUrl = buildTradeUrl(parsed, league);
+  let totalOnTrade = 0;
 
-  const directUrl = await tryTradeApiSearch(tradeQuery, league);
-  if (directUrl) {
-    tradeUrl = directUrl;
+  // Try the real trade API search
+  const searchResult = await tryTradeApiSearch(tradeQuery, league);
+  if (searchResult) {
+    tradeUrl = searchResult.url;
+    totalOnTrade = searchResult.total;
+
+    // Fetch actual listing prices
+    const fetchedListings = await fetchTradeListings(
+      searchResult.searchId,
+      searchResult.resultIds,
+      league,
+    );
+    if (fetchedListings.length > 0) {
+      listings = fetchedListings;
+    }
   }
 
   const category = ITEM_CLASS_TRADE_CATEGORIES[parsed.itemClass] || "";
 
-  if (parsed.rarity === "Unique") {
-    listings.push({
-      id: "hint-unique",
-      price: { amount: 0, currency: "unknown" },
-      seller: "Trade Site",
-      listed: "",
-      itemName: parsed.name,
-      itemMods: [`Search for "${parsed.name}" on the official trade site`],
-    });
-  } else {
-    const searchTerms: string[] = [];
-    if (parsed.baseType) searchTerms.push(`Base: ${parsed.baseType}`);
-    if (parsed.itemLevel >= 80) searchTerms.push(`iLvl: ${parsed.itemLevel}+`);
+  // If we got no real listings, provide helpful search hints
+  if (listings.length === 0) {
+    if (parsed.rarity === "Unique") {
+      // Try poe.ninja for unique pricing as fallback
+      try {
+        const unique = await findUniqueByName(parsed.name, league);
+        if (unique && unique.chaosValue > 0) {
+          listings.push({
+            id: "ninja-price",
+            price: { amount: unique.chaosValue, currency: "chaos" },
+            seller: "poe.ninja avg",
+            listed: "average",
+            itemName: unique.name,
+            itemMods: [
+              `Average price: ${unique.chaosValue.toFixed(1)} chaos`,
+              unique.divineValue && unique.divineValue > 0
+                ? `(${unique.divineValue.toFixed(2)} divine)`
+                : "",
+              `${unique.listingCount} listings tracked`,
+            ].filter(Boolean),
+          });
+        }
+      } catch { /* poe.ninja fallback failed silently */ }
 
-    listings.push({
-      id: "hint-search-base",
-      price: { amount: 0, currency: "chaos" },
-      seller: "Search Tip",
-      listed: "",
-      itemName: `${parsed.baseType} (${parsed.itemClass})`,
-      itemMods: [
-        category ? `Trade category: ${category}` : "Search by item type",
-        ...searchTerms,
-      ],
-    });
+      if (listings.length === 0) {
+        listings.push({
+          id: "hint-unique",
+          price: { amount: 0, currency: "unknown" },
+          seller: "Trade Site",
+          listed: "",
+          itemName: parsed.name,
+          itemMods: [`Search for "${parsed.name}" on the official trade site`],
+        });
+      }
+    } else {
+      const searchTerms: string[] = [];
+      if (parsed.baseType) searchTerms.push(`Base: ${parsed.baseType}`);
+      if (parsed.itemLevel >= 80) searchTerms.push(`iLvl: ${parsed.itemLevel}+`);
+
+      listings.push({
+        id: "hint-search-base",
+        price: { amount: 0, currency: "chaos" },
+        seller: "Search Tip",
+        listed: "",
+        itemName: `${parsed.baseType} (${parsed.itemClass})`,
+        itemMods: [
+          category ? `Trade category: ${category}` : "Search by item type",
+          ...searchTerms,
+          totalOnTrade > 0 ? `${totalOnTrade} results found on trade site` : "Try broadening your search",
+        ],
+      });
+    }
   }
 
   return {
     listings,
-    total: listings.length,
+    total: totalOnTrade || listings.length,
     tradeUrl,
     statFilters,
     itemCategory: category,
